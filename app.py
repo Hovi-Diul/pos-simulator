@@ -12,18 +12,18 @@ st.markdown("Интерактивен калкулатор за симулаци
 # ==========================================
 HIDDEN_COSTS = {
     "VS/MC/Maestro consumer debit": {
-        "variable": 0.15,   # %
-        "fixed": 0.05,      # € на транзакция
-        "interchange": 0.70 # %
+        "variable": 0.1010,   # %
+        "fixed": 0.0116,      # € на транзакция
+        "interchange": 0.20 # %
     },
     "VS/MC/Maestro consumer credit": {
-        "variable": 0.20,
-        "fixed": 0.05,
-        "interchange": 1.10
+        "variable": 0.1060,
+        "fixed": 0.0116,
+        "interchange": 0.30
     },
     "VS/MC/Maestro commercial": {
-        "variable": 0.30,
-        "fixed": 0.10,
+        "variable": 0.2422,
+        "fixed": 0.0202,
         "interchange": 1.50
     }
 }
