@@ -32,7 +32,7 @@ st.markdown("---")
 st.subheader("📊 Въвеждане на сценарий от дистрибутора")
 st.markdown("Изберете вид карта, въведете очаквания месечен обем, брой транзакции и предлаганата такса (Merchant Fee).")
 
-# Начални данни за таблицата, които дистрибуторът вижда и може да редактира (само обеми и такса към мерчанта)
+# Начални данни за таблицата, които дистрибуторът вижда и може да редактира
 default_user_data = pd.DataFrame([
     {
         "Card Type": "VS/MC/Maestro consumer debit",
@@ -57,7 +57,7 @@ default_user_data = pd.DataFrame([
 # Таблицата, която дистрибуторът вижда и пипа
 edited_df = st.data_editor(default_user_data, num_rows="dynamic", use_container_width=True)
 
-# Изчисления с автоматично сливане със скътите вътрешни разходи
+# Изчисления с автоматично сливане със скритите вътрешни разходи
 if not edited_df.empty:
     df = edited_df.copy()
     
@@ -82,8 +82,8 @@ if not edited_df.empty:
     st.markdown("---")
     st.subheader("📈 Финансови Резултати")
 
-    # Показваме само чистите резултати към дистрибутора (без да разкриваме разходните компоненти)
-    st.dataframe(df[[
+    # Подготвяме таблицата за показване
+    result_df = df[[
         "Card Type", 
         "Transaction Amount (€)", 
         "Number of Transactions",
@@ -92,7 +92,19 @@ if not edited_df.empty:
         "Profit ICARD (€)", 
         "Agent Commission (30%) (€)", 
         "Net Profit ICARD (€)"
-    ]].style.format("{:.2f}"))
+    ]]
+
+    # Форматираме само числените колони, за да избегнем грешката с текста
+    numeric_cols = [
+        "Transaction Amount (€)", 
+        "Merchant Fee (%)",
+        "Collected Merchant Fee (€)", 
+        "Profit ICARD (€)", 
+        "Agent Commission (30%) (€)", 
+        "Net Profit ICARD (€)"
+    ]
+    
+    st.dataframe(result_df.style.format("{:.2f}", subset=numeric_cols), use_container_width=True)
 
     # Обобщени KPI метрики в горната част
     total_volume = df["Transaction Amount (€)"].sum()
