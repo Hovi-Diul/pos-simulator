@@ -81,7 +81,7 @@ if not edited_df.empty:
     st.markdown("---")
     st.subheader("📈 Финансови Резултати")
 
-    # Подготвяме таблицата за показване (без Profit ICARD и Net Profit ICARD)
+    # Подготвяме таблицата за показване
     result_df = df[[
         "Card Type", 
         "Transaction Amount (€)", 
@@ -91,7 +91,7 @@ if not edited_df.empty:
         "Agent Commission (30%) (€)"
     ]]
 
-    # Преименуваме колоната за агента в таблицата, за да е по-удобна за четене
+    # Преименуваме колоната за агента в таблицата
     result_df = result_df.rename(columns={"Agent Commission (30%) (€)": "Комисионна дистрибутор (€)"})
 
     # Форматираме само числените колони
@@ -104,7 +104,7 @@ if not edited_df.empty:
     
     st.dataframe(result_df.style.format("{:.2f}", subset=numeric_cols), use_container_width=True)
 
-    # Обобщени KPI метрики в края на екрана (точно 3 колони: Общ Обем / Събрана Такса / Комисионна дистрибутор)
+    # Обобщени KPI метрики (сумирани за всички редове/карти)
     total_volume = df["Transaction Amount (€)"].sum()
     total_collected = df["Collected Merchant Fee (€)"].sum()
     total_agent_comm = df["Agent Commission (30%) (€)"].sum()
