@@ -118,3 +118,4 @@ if not edited_df.empty:
     col2.metric("Събрана Такса", f"€{total_collected:,.2f}")
     col3.metric("ICARD Бруто Приход", f"€{total_icard_profit:,.2f}")
     col4.metric("ICARD Нетна Печалба", f"€{total_net_profit:,.2f}")
+    col5.metric("Дистрибутор Печалба", f"€{total_agent_comm:,.2f}")
