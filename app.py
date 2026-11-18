@@ -77,45 +77,42 @@ if not edited_df.empty:
     
     df["Profit ICARD (€)"] = df["Collected Merchant Fee (€)"] - df["Total Cost (€)"]
     df["Agent Commission (30%) (€)"] = df["Profit ICARD (€)"] * 0.30
-    df["Net Profit ICARD (€)"] = df["Profit ICARD (€)"] - df["Agent Commission (30%) (€)"]
 
     st.markdown("---")
     st.subheader("📈 Финансови Резултати")
 
-    # Подготвяме таблицата за показване
+    # Подготвяме таблицата за показване (без Profit ICARD и Net Profit ICARD)
     result_df = df[[
         "Card Type", 
         "Transaction Amount (€)", 
         "Number of Transactions",
         "Merchant Fee (%)",
         "Collected Merchant Fee (€)", 
-        "Profit ICARD (€)", 
-        "Agent Commission (30%) (€)", 
-        "Net Profit ICARD (€)"
+        "Agent Commission (30%) (€)"
     ]]
 
-    # Форматираме само числените колони, за да избегнем грешката с текста
+    # Преименуваме колоната за агента в таблицата, за да е по-удобна за четене
+    result_df = result_df.rename(columns={"Agent Commission (30%) (€)": "Комисионна дистрибутор (€)"})
+
+    # Форматираме само числените колони
     numeric_cols = [
         "Transaction Amount (€)", 
         "Merchant Fee (%)",
         "Collected Merchant Fee (€)", 
-        "Profit ICARD (€)", 
-        "Agent Commission (30%) (€)", 
-        "Net Profit ICARD (€)"
+        "Комисионна дистрибутор (€)"
     ]
     
     st.dataframe(result_df.style.format("{:.2f}", subset=numeric_cols), use_container_width=True)
 
-    # Обобщени KPI метрики в горната част
+    # Обобщени KPI метрики в края на екрана (точно 3 колони: Общ Обем / Събрана Такса / Комисионна дистрибутор)
     total_volume = df["Transaction Amount (€)"].sum()
     total_collected = df["Collected Merchant Fee (€)"].sum()
-    total_icard_profit = df["Profit ICARD (€)"].sum()
     total_agent_comm = df["Agent Commission (30%) (€)"].sum()
-    total_net_profit = df["Net Profit ICARD (€)"].sum()
 
-    col1, col2, col3, col4 = st.columns(4)
+    st.markdown("---")
+    st.subheader("📌 Обобщение на симулацията")
+    
+    col1, col2, col3 = st.columns(3)
     col1.metric("Общ Обем", f"€{total_volume:,.2f}")
     col2.metric("Събрана Такса", f"€{total_collected:,.2f}")
-    col3.metric("ICARD Бруто Приход", f"€{total_icard_profit:,.2f}")
-    col4.metric("ICARD Нетна Печалба", f"€{total_net_profit:,.2f}")
-    col5.metric("Дистрибутор Печалба", f"€{total_agent_comm:,.2f}")
+    col3.metric("Комисионна дистрибутор", f"€{total_agent_comm:,.2f}")
