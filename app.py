@@ -30,25 +30,25 @@ HIDDEN_COSTS = {
 
 st.markdown("---")
 st.subheader("📊 Въвеждане на сценарий от дистрибутора")
-st.markdown("Изберете вид карта, въведете очаквания месечен обем, брой транзакции и предлаганата такса (Merchant Fee).")
+st.markdown("Изберете вид карта, въведете средна сума на транзакция, брой транзакции и предлаганата такса (Merchant Fee).")
 
 # Начални данни за таблицата, които дистрибуторът вижда и може да редактира
 default_user_data = pd.DataFrame([
     {
         "Card Type": "VS/MC/Maestro consumer debit",
-        "Transaction Amount (€)": 50000.0,
-        "Number of Transactions": 1000,
+        "Transaction Amount (€)": 50.0,  # Средна сума на транзакция
+        "Number of Transactions": 1000,   # Брой транзакции
         "Merchant Fee (%)": 1.10
     },
     {
         "Card Type": "VS/MC/Maestro consumer credit",
-        "Transaction Amount (€)": 20000.0,
+        "Transaction Amount (€)": 100.0,
         "Number of Transactions": 300,
         "Merchant Fee (%)": 1.50
     },
     {
         "Card Type": "VS/MC/Maestro commercial",
-        "Transaction Amount (€)": 10000.0,
+        "Transaction Amount (€)": 200.0,
         "Number of Transactions": 100,
         "Merchant Fee (%)": 2.00
     }
@@ -66,13 +66,16 @@ if not edited_df.empty:
     df["Fixed Component (€/tx)"] = df["Card Type"].map(lambda x: HIDDEN_COSTS.get(x, {"fixed": 0})["fixed"])
     df["Interchange Fee (%)"] = df["Card Type"].map(lambda x: HIDDEN_COSTS.get(x, {"interchange": 0})["interchange"])
     
-    # Формули
-    df["Collected Merchant Fee (€)"] = df["Transaction Amount (€)"] * (df["Merchant Fee (%)"] / 100)
+    # ИЗЧИСЛЕНИЕ НА ОБЩИЯ ОБОБ (ОБЕМ) ЗА ВСЯКА КАРТА = Средна сума × Брой транзакции
+    df["Total Volume (€)"] = df["Transaction Amount (€)"] * df["Number of Transactions"]
+    
+    # Формули спрямо общия обем
+    df["Collected Merchant Fee (€)"] = df["Total Volume (€)"] * (df["Merchant Fee (%)"] / 100)
     
     df["Total Cost (€)"] = (
-        (df["Transaction Amount (€)"] * (df["Variable Component (%)"] / 100)) +
+        (df["Total Volume (€)"] * (df["Variable Component (%)"] / 100)) +
         (df["Number of Transactions"] * df["Fixed Component (€/tx)"]) +
-        (df["Transaction Amount (€)"] * (df["Interchange Fee (%)"] / 100))
+        (df["Total Volume (€)"] * (df["Interchange Fee (%)"] / 100))
     )
     
     df["Profit ICARD (€)"] = df["Collected Merchant Fee (€)"] - df["Total Cost (€)"]
@@ -81,22 +84,20 @@ if not edited_df.empty:
     st.markdown("---")
     st.subheader("📈 Финансови Резултати")
 
-    # Подготвяме таблицата за показване
-    result_df = df[[
-        "Card Type", 
-        "Transaction Amount (€)", 
-        "Number of Transactions",
-        "Merchant Fee (%)",
-        "Collected Merchant Fee (€)", 
-        "Agent Commission (30%) (€)"
-    ]]
+    # Подготвяме таблицата за показване (показваме изчислния общ оборот за картата)
+    result_df = pd.DataFrame({
+        "Card Type": df["Card Type"],
+        "Total Volume (€)": df["Total Volume (€)"],
+        "Number of Transactions": df["Number of Transactions"],
+        "Merchant Fee (%)": df["Merchant Fee (%)"],
+        "Collected Merchant Fee (€)": df["Collected Merchant Fee (€)"],
+        "Комисионна дистрибутор (€)": df["Agent Commission (30%) (€)"]
+    })
 
-    # Преименуваме колоната за агента в таблицата
-    result_df = result_df.rename(columns={"Agent Commission (30%) (€)": "Комисионна дистрибутор (€)"})
-
-    # Форматираме само числените колони
+    # Форматираме числените колони
     numeric_cols = [
-        "Transaction Amount (€)", 
+        "Total Volume (€)", 
+        "Number of Transactions",
         "Merchant Fee (%)",
         "Collected Merchant Fee (€)", 
         "Комисионна дистрибутор (€)"
@@ -105,14 +106,14 @@ if not edited_df.empty:
     st.dataframe(result_df.style.format("{:.2f}", subset=numeric_cols), use_container_width=True)
 
     # Обобщени KPI метрики (сумирани за всички редове/карти)
-    total_volume = df["Transaction Amount (€)"].sum()
-    total_collected = df["Collected Merchant Fee (€)"].sum()
-    total_agent_comm = df["Agent Commission (30%) (€)"].sum()
+    total_turnover = df["Total Volume (€)"].sum()  # Общ оборот (сума от обемите на всички карти)
+    total_collected = df["Collected Merchant Fee (€)"].sum()  # Общо събрани такси
+    total_agent_comm = df["Agent Commission (30%) (€)"].sum()  # Обща комисионна за дистрибутора
 
     st.markdown("---")
     st.subheader("📌 Обобщение на симулацията")
     
     col1, col2, col3 = st.columns(3)
-    col1.metric("Общ Обем", f"€{total_volume:,.2f}")
+    col1.metric("Общ Обем", f"€{total_turnover:,.2f}")
     col2.metric("Събрана Такса", f"€{total_collected:,.2f}")
     col3.metric("Комисионна дистрибутор", f"€{total_agent_comm:,.2f}")
