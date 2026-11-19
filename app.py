@@ -71,19 +71,19 @@ def get_default_domestic() -> pd.DataFrame:
             "Card Type": "Visa/Mastercard/Maestro - Debit (Domestic)",
             "Transaction Amount (€)": 50.0,
             "Number of Transactions": 100,
-            "Merchant Fee (%)": 1.10
+            "Merchant Fee (%)": 0.95
         },
         {
             "Card Type": "Visa/Mastercard/Maestro - Credit (Domestic)",
-            "Transaction Amount (€)": 50.0,
-            "Number of Transactions": 100,
-            "Merchant Fee (%)": 1.50
+            "Transaction Amount (€)": 75.0,
+            "Number of Transactions": 80,
+            "Merchant Fee (%)": 1.20
         },
         {
             "Card Type": "Visa/Mastercard/Maestro - Commercial (Domestic)",
-            "Transaction Amount (€)": 50.0,
-            "Number of Transactions": 100,
-            "Merchant Fee (%)": 2.00
+            "Transaction Amount (€)": 100.0,
+            "Number of Transactions": 40,
+            "Merchant Fee (%)": 2.60
         }
     ])
 
@@ -98,15 +98,15 @@ def get_default_eea() -> pd.DataFrame:
         },
         {
             "Card Type": "Visa/Mastercard/Maestro - Credit (EEA)",
-            "Transaction Amount (€)": 50.0,
-            "Number of Transactions": 100,
-            "Merchant Fee (%)": 1.50
+            "Transaction Amount (€)": 90.0,
+            "Number of Transactions": 50,
+            "Merchant Fee (%)": 1.60
         },
         {
             "Card Type": "Visa/Mastercard/Maestro - Commercial (EEA)",
-            "Transaction Amount (€)": 50.0,
-            "Number of Transactions": 100,
-            "Merchant Fee (%)": 2.00
+            "Transaction Amount (€)": 90.0,
+            "Number of Transactions": 35,
+            "Merchant Fee (%)": 2.60
         }
     ])
 
