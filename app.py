@@ -27,13 +27,13 @@ HIDDEN_COSTS = {
         "interchange": 1.50
     },
     "Visa/Mastercard/Maestro - Debit (EEA)": {
-        "variable": 0.1010,    # %
-        "fixed": 0.0116,       # EUR per transaction
+        "variable": 0.2422,    # %
+        "fixed": 0.0148,       # EUR per transaction
         "interchange": 0.20    # %
     },
     "Visa/Mastercard/Maestro - Credit (EEA)": {
-        "variable": 0.1060,
-        "fixed": 0.0116,
+        "variable": 0.2422,
+        "fixed": 0.02019,
         "interchange": 0.30
     },
     "Visa/Mastercard/Maestro - Commercial (EEA)": {
@@ -42,8 +42,8 @@ HIDDEN_COSTS = {
         "interchange": 1.50
     },
     "All cards (International)": {
-        "variable": 0.2422,    # %
-        "fixed": 0.0202,       # EUR per transaction
+        "variable": 0.8405,    # %
+        "fixed": 0.2260,       # EUR per transaction
         "interchange": 1.50    # %
     }
 }
