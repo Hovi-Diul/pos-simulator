@@ -8,7 +8,7 @@ st.markdown("Interactive calculator for simulating revenues, costs, and commissi
 
 # ==========================================
 # HIDDEN INTERNAL ICARD COSTS (BACKEND)
-# Distributors cannot see or modify these!
+# Distributors cannot see or modify these without internal password.
 # ==========================================
 HIDDEN_COSTS = {
     "Visa/Mastercard/Maestro - Debit (Domestic)": {
@@ -47,6 +47,8 @@ HIDDEN_COSTS = {
         "interchange": 1.50    # %
     }
 }
+
+INTERNAL_PASSWORD = st.secrets.get("INTERNAL_PASSWORD", "ICARD_INTERNAL_2026")
 
 DOMESTIC_CARD_OPTIONS = [
     "Visa/Mastercard/Maestro - Debit (Domestic)",
@@ -134,6 +136,9 @@ if "eea_data" not in st.session_state:
 if "international_data" not in st.session_state:
     st.session_state.international_data = get_default_international()
 
+if "internal_unlocked" not in st.session_state:
+    st.session_state.internal_unlocked = False
+
 # Reset button in the top controls
 if st.button("Reset to Defaults"):
     st.session_state.domestic_data = get_default_domestic()
@@ -181,7 +186,7 @@ def build_editor(title: str, description: str, data_df: pd.DataFrame, card_optio
     )
 
 
-def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
+def calculate_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
     if edited_df is None or edited_df.empty:
         return pd.DataFrame()
 
@@ -209,7 +214,13 @@ def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
     df["Agent Commission (€)"] = (df["Profit ICARD (€)"] * 0.30).clip(lower=0.0)
 
     grouped_df = df.groupby("Card Type", as_index=False)[
-        ["Total Turnover (€)", "Collected Fee (€)", "Agent Commission (€)"]
+        [
+            "Total Turnover (€)",
+            "Collected Fee (€)",
+            "Total Cost (€)",
+            "Profit ICARD (€)",
+            "Agent Commission (€)"
+        ]
     ].sum()
 
     grouped_df["Merchant Fee (%)"] = grouped_df.apply(
@@ -217,13 +228,7 @@ def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
         axis=1
     )
 
-    return grouped_df[[
-        "Card Type",
-        "Total Turnover (€)",
-        "Merchant Fee (%)",
-        "Collected Fee (€)",
-        "Agent Commission (€)"
-    ]].rename(columns={"Collected Fee (€)": "Total Collected Fee (€)"})
+    return grouped_df
 
 
 edited_domestic = build_editor(
@@ -250,21 +255,29 @@ edited_international = build_editor(
     key_prefix="international_editor"
 )
 
-domestic_results = process_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0])
-eea_results = process_section(edited_eea, EEA_CARD_OPTIONS[0])
-international_results = process_section(edited_international, INTERNATIONAL_CARD_OPTIONS[0])
+domestic_full = calculate_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0])
+eea_full = calculate_section(edited_eea, EEA_CARD_OPTIONS[0])
+international_full = calculate_section(edited_international, INTERNATIONAL_CARD_OPTIONS[0])
 
-combined_results = pd.concat(
-    [df for df in [domestic_results, eea_results, international_results] if not df.empty],
+combined_full = pd.concat(
+    [df for df in [domestic_full, eea_full, international_full] if not df.empty],
     ignore_index=True
 )
 
-if not combined_results.empty:
+if not combined_full.empty:
+    distributor_results = combined_full[[
+        "Card Type",
+        "Total Turnover (€)",
+        "Merchant Fee (%)",
+        "Collected Fee (€)",
+        "Agent Commission (€)"
+    ]].rename(columns={"Collected Fee (€)": "Total Collected Fee (€)"})
+
     st.markdown("---")
     st.subheader("Financial Results")
 
     st.dataframe(
-        combined_results,
+        distributor_results,
         width="stretch",
         hide_index=True,
         column_config={
@@ -275,9 +288,9 @@ if not combined_results.empty:
         }
     )
 
-    total_volume = float(combined_results["Total Turnover (€)"].sum())
-    total_collected = float(combined_results["Total Collected Fee (€)"].sum())
-    total_agent_comm = float(combined_results["Agent Commission (€)"].sum())
+    total_volume = float(distributor_results["Total Turnover (€)"].sum())
+    total_collected = float(distributor_results["Total Collected Fee (€)"].sum())
+    total_agent_comm = float(distributor_results["Agent Commission (€)"].sum())
 
     st.markdown("---")
     st.subheader("Simulation Summary")
@@ -286,3 +299,78 @@ if not combined_results.empty:
     col1.metric("Total Volume", f"€{total_volume:,.2f}")
     col2.metric("Total Collected Fee", f"€{total_collected:,.2f}")
     col3.metric("Agent Commission", f"€{total_agent_comm:,.2f}")
+
+# ==========================================
+# INTERNAL ICARD SECTION (PASSWORD PROTECTED)
+# ==========================================
+st.markdown("---")
+st.subheader("Internal ICARD Parameters & Profit")
+
+entered_password = st.text_input(
+    "Internal access password",
+    type="password",
+    key="internal_password_input"
+)
+
+if entered_password:
+    if entered_password == INTERNAL_PASSWORD:
+        st.session_state.internal_unlocked = True
+    else:
+        st.session_state.internal_unlocked = False
+        st.error("Invalid password.")
+
+if st.session_state.internal_unlocked:
+    costs_df = pd.DataFrame([
+        {
+            "Card Type": card,
+            "Variable (%)": vals["variable"],
+            "Fixed (€/tx)": vals["fixed"],
+            "Interchange (%)": vals["interchange"]
+        }
+        for card, vals in HIDDEN_COSTS.items()
+    ])
+
+    st.markdown("#### Cost Parameters by Card & Region")
+    st.dataframe(
+        costs_df,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Variable (%)": st.column_config.NumberColumn("Variable (%)", format="%.4f"),
+            "Fixed (€/tx)": st.column_config.NumberColumn("Fixed (€/tx)", format="%.5f"),
+            "Interchange (%)": st.column_config.NumberColumn("Interchange (%)", format="%.2f"),
+        }
+    )
+
+    if not combined_full.empty:
+        internal_breakdown = combined_full[[
+            "Card Type",
+            "Total Turnover (€)",
+            "Collected Fee (€)",
+            "Total Cost (€)",
+            "Profit ICARD (€)",
+            "Agent Commission (€)"
+        ]]
+
+        st.markdown("#### Profit & Cost Breakdown by Card & Region")
+        st.dataframe(
+            internal_breakdown,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Total Turnover (€)": st.column_config.NumberColumn("Total Turnover (€)", format="%.2f"),
+                "Collected Fee (€)": st.column_config.NumberColumn("Collected Fee (€)", format="%.2f"),
+                "Total Cost (€)": st.column_config.NumberColumn("Total Cost (€)", format="%.2f"),
+                "Profit ICARD (€)": st.column_config.NumberColumn("Profit ICARD (€)", format="%.2f"),
+                "Agent Commission (€)": st.column_config.NumberColumn("Agent Commission (€)", format="%.2f"),
+            }
+        )
+
+        total_cost = float(combined_full["Total Cost (€)"].sum())
+        total_icard_profit = float(combined_full["Profit ICARD (€)"].sum())
+        total_comm = float(combined_full["Agent Commission (€)"].sum())
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total ICARD Cost", f"€{total_cost:,.2f}")
+        m2.metric("ICARD Profit (Gross)", f"€{total_icard_profit:,.2f}")
+        m3.metric("Agent Commission", f"€{total_comm:,.2f}")
