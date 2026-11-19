@@ -4,7 +4,7 @@ import pandas as pd
 st.set_page_config(page_title="ICARD POS Commission Simulator", layout="wide")
 
 st.title("POS Commission & Profit Simulator")
-st.markdown("Interactive calculator for simulating revenues, costs, and commissions before signing a contract.")
+st.markdown("Interactive calculator for simulating revenues, costs, and commissions.")
 
 # ==========================================
 # HIDDEN INTERNAL ICARD COSTS (BACKEND)
@@ -227,7 +227,7 @@ def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
 
 
 edited_domestic = build_editor(
-    title="Domestic Cards Scenario Input",
+    title="Domestic Cards",
     description="Select a Domestic card type, enter the average transaction amount, number of transactions, and proposed Merchant Fee (%).",
     data_df=st.session_state.domestic_data,
     card_options=DOMESTIC_CARD_OPTIONS,
@@ -235,7 +235,7 @@ edited_domestic = build_editor(
 )
 
 edited_eea = build_editor(
-    title="EEA Cards Scenario Input",
+    title="EEA Cards",
     description="Select an EEA card type, enter the average transaction amount, number of transactions, and proposed Merchant Fee (%).",
     data_df=st.session_state.eea_data,
     card_options=EEA_CARD_OPTIONS,
@@ -243,7 +243,7 @@ edited_eea = build_editor(
 )
 
 edited_international = build_editor(
-    title="International Cards Scenario Input",
+    title="International Cards",
     description="Enter the average transaction amount, number of transactions, and proposed Merchant Fee (%) for International cards.",
     data_df=st.session_state.international_data,
     card_options=INTERNATIONAL_CARD_OPTIONS,
