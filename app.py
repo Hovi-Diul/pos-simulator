@@ -38,20 +38,20 @@ default_user_data = pd.DataFrame([
     {
         "Card Type": "Visa/Mastercard/Maestro - Debit",
         "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 1000,
-        "Merchant Fee (%)": 1.10
+        "Number of Transactions": 100,
+        "Merchant Fee (%)": 0.95
     },
     {
         "Card Type": "Visa/Mastercard/Maestro - Credit",
-        "Transaction Amount (€)": 100.0,
-        "Number of Transactions": 300,
-        "Merchant Fee (%)": 1.50
+        "Transaction Amount (€)": 75.0,
+        "Number of Transactions": 100,
+        "Merchant Fee (%)": 1.20
     },
     {
         "Card Type": "Visa/Mastercard/Maestro - Commercial",
-        "Transaction Amount (€)": 200.0,
+        "Transaction Amount (€)": 100.0,
         "Number of Transactions": 100,
-        "Merchant Fee (%)": 2.00
+        "Merchant Fee (%)": 2.60
     }
 ])
 
