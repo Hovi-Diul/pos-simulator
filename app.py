@@ -296,85 +296,6 @@ edited_international = build_editor(
     key_prefix="international_editor"
 )
 
-# ==========================================
-# INTERNAL ICARD SECTION (PASSWORD PROTECTED)
-# ==========================================
-st.markdown("---")
-st.subheader("Internal ICARD Parameters & Profit")
-
-entered_password = st.text_input(
-    "Internal access password",
-    type="password",
-    key="internal_password_input"
-)
-
-if entered_password:
-    if entered_password == INTERNAL_PASSWORD:
-        st.session_state.internal_unlocked = True
-    else:
-        st.session_state.internal_unlocked = False
-        st.error("Invalid password.")
-
-if st.session_state.internal_unlocked:
-    st.markdown("#### Cost Parameters by Card & Region (Editable)")
-    st.caption("Any change updates calculations immediately. Click 'Save as Default' to store updated values as the default for this session.")
-
-    edited_costs_df = st.data_editor(
-        costs_dict_to_df(st.session_state.active_costs),
-        num_rows="fixed",
-        width="stretch",
-        key=f"internal_costs_editor_{st.session_state.costs_reset_counter}",
-        column_config={
-            "Card Type": st.column_config.TextColumn("Card Type", disabled=True),
-            "Variable (%)": st.column_config.NumberColumn(
-                "Variable (%)",
-                min_value=0.0,
-                step=0.001,
-                format="%.4f"
-            ),
-            "Fixed (€/tx)": st.column_config.NumberColumn(
-                "Fixed (€/tx)",
-                min_value=0.0,
-                step=0.0001,
-                format="%.5f"
-            ),
-            "Interchange (%)": st.column_config.NumberColumn(
-                "Interchange (%)",
-                min_value=0.0,
-                step=0.01,
-                format="%.2f"
-            ),
-        }
-    )
-
-    # Apply live edits immediately to active_costs
-    live_costs = df_to_costs_dict(edited_costs_df, st.session_state.active_costs)
-    st.session_state.active_costs = live_costs
-
-    btn_col1, btn_col2 = st.columns([1, 1])
-    with btn_col1:
-        if st.button("Save as Default"):
-            st.session_state.saved_default_costs = {k: dict(v) for k, v in live_costs.items()}
-            st.session_state.costs_saved_message = "Saved current parameters as default for this session."
-    with btn_col2:
-        if st.button("Restore Saved Default"):
-            st.session_state.active_costs = {k: dict(v) for k, v in st.session_state.saved_default_costs.items()}
-            st.session_state.costs_reset_counter += 1
-            st.session_state.costs_saved_message = "Restored saved default parameters."
-            st.rerun()
-
-    if st.session_state.costs_saved_message:
-        st.success(st.session_state.costs_saved_message)
-
-    with st.expander("Export updated defaults for permanent code update"):
-        st.download_button(
-            label="Download Parameters (JSON)",
-            data=json.dumps(st.session_state.saved_default_costs, indent=2),
-            file_name="icard_hidden_costs.json",
-            mime="application/json"
-        )
-        st.code(f"BASE_HIDDEN_COSTS = {json.dumps(st.session_state.saved_default_costs, indent=4)}", language="python")
-
 active_costs_map = st.session_state.active_costs
 
 domestic_full = calculate_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0], active_costs_map)
@@ -422,35 +343,23 @@ if not combined_full.empty:
     col2.metric("Total Collected Fee", f"€{total_collected:,.2f}")
     col3.metric("Agent Commission", f"€{total_agent_comm:,.2f}")
 
-if st.session_state.internal_unlocked and not combined_full.empty:
-    internal_breakdown = combined_full[[
-        "Card Type",
-        "Total Turnover (€)",
-        "Collected Fee (€)",
-        "Total Cost (€)",
-        "Profit ICARD (€)",
-        "Agent Commission (€)"
-    ]]
+# ==========================================
+# INTERNAL ICARD SECTION (AFTER SIMULATION SUMMARY)
+# ==========================================
+st.markdown("---")
+st.subheader("Internal ICARD Parameters & Profit")
 
-    st.markdown("#### Profit & Cost Breakdown by Card & Region")
-    st.dataframe(
-        internal_breakdown,
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "Total Turnover (€)": st.column_config.NumberColumn("Total Turnover (€)", format="%.2f"),
-            "Collected Fee (€)": st.column_config.NumberColumn("Collected Fee (€)", format="%.2f"),
-            "Total Cost (€)": st.column_config.NumberColumn("Total Cost (€)", format="%.2f"),
-            "Profit ICARD (€)": st.column_config.NumberColumn("Profit ICARD (€)", format="%.2f"),
-            "Agent Commission (€)": st.column_config.NumberColumn("Agent Commission (€)", format="%.2f"),
-        }
-    )
+entered_password = st.text_input(
+    "Internal access password",
+    type="password",
+    key="internal_password_input"
+)
 
-    total_cost = float(combined_full["Total Cost (€)"].sum())
-    total_icard_profit = float(combined_full["Profit ICARD (€)"].sum())
-    total_comm = float(combined_full["Agent Commission (€)"].sum())
+if entered_password:
+    if entered_password == INTERNAL_PASSWORD:
+        st.session_state.internal_unlocked = True
+    else:
+        st.session_state.internal_unlocked = False
+        st.error("Invalid password.")
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total ICARD Cost", f"€{total_cost:,.2f}")
-    m2.metric("ICARD Profit (Gross)", f"€{total_icard_profit:,.2f}")
-    m3.metric("Agent Commission", f"€{total_comm:,.2f}")
+if st.
