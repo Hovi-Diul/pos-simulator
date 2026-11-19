@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import pandas as pd
 
@@ -7,10 +8,10 @@ st.title("POS Commission & Profit Simulator")
 st.markdown("Interactive calculator for simulating revenues, costs, and commissions.")
 
 # ==========================================
-# HIDDEN INTERNAL ICARD COSTS (BACKEND)
+# BASE INTERNAL ICARD COSTS (INITIAL DEFAULTS)
 # Distributors cannot see or modify these without internal password.
 # ==========================================
-HIDDEN_COSTS = {
+BASE_HIDDEN_COSTS = {
     "Visa/Mastercard/Maestro - Debit (Domestic)": {
         "variable": 0.1010,    # %
         "fixed": 0.0116,       # EUR per transaction
@@ -65,6 +66,34 @@ EEA_CARD_OPTIONS = [
 INTERNATIONAL_CARD_OPTIONS = [
     "All cards (International)"
 ]
+
+
+def costs_dict_to_df(costs_dict: dict) -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Card Type": card,
+            "Variable (%)": float(vals["variable"]),
+            "Fixed (€/tx)": float(vals["fixed"]),
+            "Interchange (%)": float(vals["interchange"])
+        }
+        for card, vals in costs_dict.items()
+    ])
+
+
+def df_to_costs_dict(df: pd.DataFrame, fallback: dict) -> dict:
+    updated = {k: dict(v) for k, v in fallback.items()}
+    if df is None or df.empty:
+        return updated
+
+    for _, row in df.iterrows():
+        card = str(row.get("Card Type", "")).strip()
+        if card:
+            updated[card] = {
+                "variable": float(pd.to_numeric(row.get("Variable (%)"), errors="coerce") or 0.0),
+                "fixed": float(pd.to_numeric(row.get("Fixed (€/tx)"), errors="coerce") or 0.0),
+                "interchange": float(pd.to_numeric(row.get("Interchange (%)"), errors="coerce") or 0.0),
+            }
+    return updated
 
 
 def get_default_domestic() -> pd.DataFrame:
@@ -127,6 +156,15 @@ def get_default_international() -> pd.DataFrame:
 if "reset_counter" not in st.session_state:
     st.session_state.reset_counter = 0
 
+if "costs_reset_counter" not in st.session_state:
+    st.session_state.costs_reset_counter = 0
+
+if "saved_default_costs" not in st.session_state:
+    st.session_state.saved_default_costs = {k: dict(v) for k, v in BASE_HIDDEN_COSTS.items()}
+
+if "active_costs" not in st.session_state:
+    st.session_state.active_costs = {k: dict(v) for k, v in BASE_HIDDEN_COSTS.items()}
+
 if "domestic_data" not in st.session_state:
     st.session_state.domestic_data = get_default_domestic()
 
@@ -139,7 +177,10 @@ if "international_data" not in st.session_state:
 if "internal_unlocked" not in st.session_state:
     st.session_state.internal_unlocked = False
 
-# Reset button in the top controls
+if "costs_saved_message" not in st.session_state:
+    st.session_state.costs_saved_message = ""
+
+# Reset button for distributor scenario tables
 if st.button("Reset to Defaults"):
     st.session_state.domestic_data = get_default_domestic()
     st.session_state.eea_data = get_default_eea()
@@ -186,7 +227,7 @@ def build_editor(title: str, description: str, data_df: pd.DataFrame, card_optio
     )
 
 
-def calculate_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
+def calculate_section(edited_df: pd.DataFrame, default_card: str, costs_map: dict) -> pd.DataFrame:
     if edited_df is None or edited_df.empty:
         return pd.DataFrame()
 
@@ -196,9 +237,9 @@ def calculate_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFram
     df["Number of Transactions"] = pd.to_numeric(df["Number of Transactions"], errors="coerce").fillna(0.0)
     df["Merchant Fee (%)"] = pd.to_numeric(df["Merchant Fee (%)"], errors="coerce").fillna(0.0)
 
-    df["Variable Component (%)"] = df["Card Type"].map(lambda x: HIDDEN_COSTS.get(x, {"variable": 0.0})["variable"])
-    df["Fixed Component (€/tx)"] = df["Card Type"].map(lambda x: HIDDEN_COSTS.get(x, {"fixed": 0.0})["fixed"])
-    df["Interchange Fee (%)"] = df["Card Type"].map(lambda x: HIDDEN_COSTS.get(x, {"interchange": 0.0})["interchange"])
+    df["Variable Component (%)"] = df["Card Type"].map(lambda x: costs_map.get(x, {"variable": 0.0})["variable"])
+    df["Fixed Component (€/tx)"] = df["Card Type"].map(lambda x: costs_map.get(x, {"fixed": 0.0})["fixed"])
+    df["Interchange Fee (%)"] = df["Card Type"].map(lambda x: costs_map.get(x, {"interchange": 0.0})["interchange"])
 
     df["Total Turnover (€)"] = df["Transaction Amount (€)"] * df["Number of Transactions"]
     df["Collected Fee (€)"] = df["Total Turnover (€)"] * (df["Merchant Fee (%)"] / 100.0)
@@ -255,9 +296,90 @@ edited_international = build_editor(
     key_prefix="international_editor"
 )
 
-domestic_full = calculate_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0])
-eea_full = calculate_section(edited_eea, EEA_CARD_OPTIONS[0])
-international_full = calculate_section(edited_international, INTERNATIONAL_CARD_OPTIONS[0])
+# ==========================================
+# INTERNAL ICARD SECTION (PASSWORD PROTECTED)
+# ==========================================
+st.markdown("---")
+st.subheader("Internal ICARD Parameters & Profit")
+
+entered_password = st.text_input(
+    "Internal access password",
+    type="password",
+    key="internal_password_input"
+)
+
+if entered_password:
+    if entered_password == INTERNAL_PASSWORD:
+        st.session_state.internal_unlocked = True
+    else:
+        st.session_state.internal_unlocked = False
+        st.error("Invalid password.")
+
+if st.session_state.internal_unlocked:
+    st.markdown("#### Cost Parameters by Card & Region (Editable)")
+    st.caption("Any change updates calculations immediately. Click 'Save as Default' to store updated values as the default for this session.")
+
+    edited_costs_df = st.data_editor(
+        costs_dict_to_df(st.session_state.active_costs),
+        num_rows="fixed",
+        width="stretch",
+        key=f"internal_costs_editor_{st.session_state.costs_reset_counter}",
+        column_config={
+            "Card Type": st.column_config.TextColumn("Card Type", disabled=True),
+            "Variable (%)": st.column_config.NumberColumn(
+                "Variable (%)",
+                min_value=0.0,
+                step=0.001,
+                format="%.4f"
+            ),
+            "Fixed (€/tx)": st.column_config.NumberColumn(
+                "Fixed (€/tx)",
+                min_value=0.0,
+                step=0.0001,
+                format="%.5f"
+            ),
+            "Interchange (%)": st.column_config.NumberColumn(
+                "Interchange (%)",
+                min_value=0.0,
+                step=0.01,
+                format="%.2f"
+            ),
+        }
+    )
+
+    # Apply live edits immediately to active_costs
+    live_costs = df_to_costs_dict(edited_costs_df, st.session_state.active_costs)
+    st.session_state.active_costs = live_costs
+
+    btn_col1, btn_col2 = st.columns([1, 1])
+    with btn_col1:
+        if st.button("Save as Default"):
+            st.session_state.saved_default_costs = {k: dict(v) for k, v in live_costs.items()}
+            st.session_state.costs_saved_message = "Saved current parameters as default for this session."
+    with btn_col2:
+        if st.button("Restore Saved Default"):
+            st.session_state.active_costs = {k: dict(v) for k, v in st.session_state.saved_default_costs.items()}
+            st.session_state.costs_reset_counter += 1
+            st.session_state.costs_saved_message = "Restored saved default parameters."
+            st.rerun()
+
+    if st.session_state.costs_saved_message:
+        st.success(st.session_state.costs_saved_message)
+
+    with st.expander("Export updated defaults for permanent code update"):
+        st.download_button(
+            label="Download Parameters (JSON)",
+            data=json.dumps(st.session_state.saved_default_costs, indent=2),
+            file_name="icard_hidden_costs.json",
+            mime="application/json"
+        )
+        st.code(f"BASE_HIDDEN_COSTS = {json.dumps(st.session_state.saved_default_costs, indent=4)}", language="python")
+
+active_costs_map = st.session_state.active_costs
+
+domestic_full = calculate_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0], active_costs_map)
+eea_full = calculate_section(edited_eea, EEA_CARD_OPTIONS[0], active_costs_map)
+international_full = calculate_section(edited_international, INTERNATIONAL_CARD_OPTIONS[0], active_costs_map)
 
 combined_full = pd.concat(
     [df for df in [domestic_full, eea_full, international_full] if not df.empty],
@@ -300,77 +422,35 @@ if not combined_full.empty:
     col2.metric("Total Collected Fee", f"€{total_collected:,.2f}")
     col3.metric("Agent Commission", f"€{total_agent_comm:,.2f}")
 
-# ==========================================
-# INTERNAL ICARD SECTION (PASSWORD PROTECTED)
-# ==========================================
-st.markdown("---")
-st.subheader("Internal ICARD Parameters & Profit")
+if st.session_state.internal_unlocked and not combined_full.empty:
+    internal_breakdown = combined_full[[
+        "Card Type",
+        "Total Turnover (€)",
+        "Collected Fee (€)",
+        "Total Cost (€)",
+        "Profit ICARD (€)",
+        "Agent Commission (€)"
+    ]]
 
-entered_password = st.text_input(
-    "Internal access password",
-    type="password",
-    key="internal_password_input"
-)
-
-if entered_password:
-    if entered_password == INTERNAL_PASSWORD:
-        st.session_state.internal_unlocked = True
-    else:
-        st.session_state.internal_unlocked = False
-        st.error("Invalid password.")
-
-if st.session_state.internal_unlocked:
-    costs_df = pd.DataFrame([
-        {
-            "Card Type": card,
-            "Variable (%)": vals["variable"],
-            "Fixed (€/tx)": vals["fixed"],
-            "Interchange (%)": vals["interchange"]
-        }
-        for card, vals in HIDDEN_COSTS.items()
-    ])
-
-    st.markdown("#### Cost Parameters by Card & Region")
+    st.markdown("#### Profit & Cost Breakdown by Card & Region")
     st.dataframe(
-        costs_df,
+        internal_breakdown,
         width="stretch",
         hide_index=True,
         column_config={
-            "Variable (%)": st.column_config.NumberColumn("Variable (%)", format="%.4f"),
-            "Fixed (€/tx)": st.column_config.NumberColumn("Fixed (€/tx)", format="%.5f"),
-            "Interchange (%)": st.column_config.NumberColumn("Interchange (%)", format="%.2f"),
+            "Total Turnover (€)": st.column_config.NumberColumn("Total Turnover (€)", format="%.2f"),
+            "Collected Fee (€)": st.column_config.NumberColumn("Collected Fee (€)", format="%.2f"),
+            "Total Cost (€)": st.column_config.NumberColumn("Total Cost (€)", format="%.2f"),
+            "Profit ICARD (€)": st.column_config.NumberColumn("Profit ICARD (€)", format="%.2f"),
+            "Agent Commission (€)": st.column_config.NumberColumn("Agent Commission (€)", format="%.2f"),
         }
     )
 
-    if not combined_full.empty:
-        internal_breakdown = combined_full[[
-            "Card Type",
-            "Total Turnover (€)",
-            "Collected Fee (€)",
-            "Total Cost (€)",
-            "Profit ICARD (€)",
-            "Agent Commission (€)"
-        ]]
+    total_cost = float(combined_full["Total Cost (€)"].sum())
+    total_icard_profit = float(combined_full["Profit ICARD (€)"].sum())
+    total_comm = float(combined_full["Agent Commission (€)"].sum())
 
-        st.markdown("#### Profit & Cost Breakdown by Card & Region")
-        st.dataframe(
-            internal_breakdown,
-            width="stretch",
-            hide_index=True,
-            column_config={
-                "Total Turnover (€)": st.column_config.NumberColumn("Total Turnover (€)", format="%.2f"),
-                "Collected Fee (€)": st.column_config.NumberColumn("Collected Fee (€)", format="%.2f"),
-                "Total Cost (€)": st.column_config.NumberColumn("Total Cost (€)", format="%.2f"),
-                "Profit ICARD (€)": st.column_config.NumberColumn("Profit ICARD (€)", format="%.2f"),
-                "Agent Commission (€)": st.column_config.NumberColumn("Agent Commission (€)", format="%.2f"),
-            }
-        )
-
-        total_cost = float(combined_full["Total Cost (€)"].sum())
-        total_icard_profit = float(combined_full["Profit ICARD (€)"].sum())
-        total_comm = float(combined_full["Agent Commission (€)"].sum())
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Total ICARD Cost", f"€{total_cost:,.2f}")
-        m2.metric("ICARD Profit (Gross)", f"€{total_icard_profit:,.2f}")
-        m3.metric("Agent Commission", f"€{total_comm:,.2f}")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total ICARD Cost", f"€{total_cost:,.2f}")
+    m2.metric("ICARD Profit (Gross)", f"€{total_icard_profit:,.2f}")
+    m3.metric("Agent Commission", f"€{total_comm:,.2f}")
