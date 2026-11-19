@@ -3,7 +3,7 @@ import pandas as pd
 
 st.set_page_config(page_title="ICARD POS Commission Simulator", layout="wide")
 
-st.title("💳 POS Commission & Profit Simulator")
+st.title("POS Commission & Profit Simulator")
 st.markdown("Interactive calculator for simulating revenues, costs, and commissions before signing a contract.")
 
 # ==========================================
@@ -11,34 +11,44 @@ st.markdown("Interactive calculator for simulating revenues, costs, and commissi
 # Distributors cannot see or modify these!
 # ==========================================
 HIDDEN_COSTS = {
-    "Visa/Mastercard/Maestro": {
-        "variable": 0.1010,   # %
-        "fixed": 0.0116,      # € per transaction
-        "interchange": 0.20   # %
+    "Visa/Mastercard/Maestro - Debit": {
+        "variable": 0.1010,    # %
+        "fixed": 0.0116,       # EUR per transaction
+        "interchange": 0.20    # %
+    },
+    "Visa/Mastercard/Maestro - Credit": {
+        "variable": 0.1060,
+        "fixed": 0.0116,
+        "interchange": 0.30
+    },
+    "Visa/Mastercard/Maestro - Commercial": {
+        "variable": 0.2422,
+        "fixed": 0.0202,
+        "interchange": 1.50
     }
 }
 
 CARD_OPTIONS = list(HIDDEN_COSTS.keys())
 
 st.markdown("---")
-st.subheader("📊 Distributor Scenario Input")
+st.subheader("Distributor Scenario Input")
 st.markdown("Select a card type, enter the average transaction amount, number of transactions, and proposed Merchant Fee (%).")
 
 default_user_data = pd.DataFrame([
     {
-        "Card Type": "Visa/Mastercard/Maestro",
+        "Card Type": "Visa/Mastercard/Maestro - Debit",
         "Transaction Amount (€)": 50.0,
         "Number of Transactions": 1000,
         "Merchant Fee (%)": 1.10
     },
     {
-        "Card Type": "Visa/Mastercard/Maestro",
+        "Card Type": "Visa/Mastercard/Maestro - Credit",
         "Transaction Amount (€)": 100.0,
         "Number of Transactions": 300,
         "Merchant Fee (%)": 1.50
     },
     {
-        "Card Type": "Visa/Mastercard/Maestro",
+        "Card Type": "Visa/Mastercard/Maestro - Commercial",
         "Transaction Amount (€)": 200.0,
         "Number of Transactions": 100,
         "Merchant Fee (%)": 2.00
@@ -122,7 +132,7 @@ if edited_df is not None and not edited_df.empty:
     ]].rename(columns={"Collected Fee (€)": "Total Collected Fee (€)"})
 
     st.markdown("---")
-    st.subheader("📈 Financial Results")
+    st.subheader("Financial Results")
 
     st.dataframe(
         result_df,
@@ -141,7 +151,7 @@ if edited_df is not None and not edited_df.empty:
     total_agent_comm = float(result_df["Agent Commission (€)"].sum())
 
     st.markdown("---")
-    st.subheader("📌 Simulation Summary")
+    st.subheader("Simulation Summary")
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Volume", f"€{total_volume:,.2f}")
