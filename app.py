@@ -40,6 +40,11 @@ HIDDEN_COSTS = {
         "variable": 0.2422,
         "fixed": 0.0202,
         "interchange": 1.50
+    },
+    "All cards (International)": {
+        "variable": 0.2422,    # %
+        "fixed": 0.0202,       # EUR per transaction
+        "interchange": 1.50    # %
     }
 }
 
@@ -55,17 +60,99 @@ EEA_CARD_OPTIONS = [
     "Visa/Mastercard/Maestro - Commercial (EEA)"
 ]
 
+INTERNATIONAL_CARD_OPTIONS = [
+    "All cards (International)"
+]
 
-def build_editor(title: str, description: str, default_rows: list, card_options: list, key: str):
+
+def get_default_domestic() -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Debit (Domestic)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 1.10
+        },
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Credit (Domestic)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 1.50
+        },
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Commercial (Domestic)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 2.00
+        }
+    ])
+
+
+def get_default_eea() -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Debit (EEA)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 1.10
+        },
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Credit (EEA)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 1.50
+        },
+        {
+            "Card Type": "Visa/Mastercard/Maestro - Commercial (EEA)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 2.00
+        }
+    ])
+
+
+def get_default_international() -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Card Type": "All cards (International)",
+            "Transaction Amount (€)": 50.0,
+            "Number of Transactions": 100,
+            "Merchant Fee (%)": 3.00
+        }
+    ])
+
+
+if "reset_counter" not in st.session_state:
+    st.session_state.reset_counter = 0
+
+if "domestic_data" not in st.session_state:
+    st.session_state.domestic_data = get_default_domestic()
+
+if "eea_data" not in st.session_state:
+    st.session_state.eea_data = get_default_eea()
+
+if "international_data" not in st.session_state:
+    st.session_state.international_data = get_default_international()
+
+# Reset button in the top controls
+if st.button("Reset to Defaults"):
+    st.session_state.domestic_data = get_default_domestic()
+    st.session_state.eea_data = get_default_eea()
+    st.session_state.international_data = get_default_international()
+    st.session_state.reset_counter += 1
+    st.rerun()
+
+
+def build_editor(title: str, description: str, data_df: pd.DataFrame, card_options: list, key_prefix: str):
     st.markdown("---")
     st.subheader(title)
     st.markdown(description)
 
     return st.data_editor(
-        pd.DataFrame(default_rows),
+        data_df,
         num_rows="dynamic",
         width="stretch",
-        key=key,
+        key=f"{key_prefix}_{st.session_state.reset_counter}",
         column_config={
             "Card Type": st.column_config.SelectboxColumn(
                 "Card Type",
@@ -118,7 +205,8 @@ def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
     )
 
     df["Profit ICARD (€)"] = df["Collected Fee (€)"] - df["Total Cost (€)"]
-    df["Agent Commission (€)"] = df["Profit ICARD (€)"] * 0.30
+    # When ICARD is at a loss (Profit < 0), distributor commission is 0.0
+    df["Agent Commission (€)"] = (df["Profit ICARD (€)"] * 0.30).clip(lower=0.0)
 
     grouped_df = df.groupby("Card Type", as_index=False)[
         ["Total Turnover (€)", "Collected Fee (€)", "Agent Commission (€)"]
@@ -138,68 +226,38 @@ def process_section(edited_df: pd.DataFrame, default_card: str) -> pd.DataFrame:
     ]].rename(columns={"Collected Fee (€)": "Total Collected Fee (€)"})
 
 
-domestic_defaults = [
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Debit (Domestic)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 1.10
-    },
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Credit (Domestic)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 1.50
-    },
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Commercial (Domestic)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 2.00
-    }
-]
-
-eea_defaults = [
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Debit (EEA)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 1.10
-    },
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Credit (EEA)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 1.50
-    },
-    {
-        "Card Type": "Visa/Mastercard/Maestro - Commercial (EEA)",
-        "Transaction Amount (€)": 50.0,
-        "Number of Transactions": 100,
-        "Merchant Fee (%)": 2.00
-    }
-]
-
 edited_domestic = build_editor(
     title="Domestic Cards Scenario Input",
     description="Select a Domestic card type, enter the average transaction amount, number of transactions, and proposed Merchant Fee (%).",
-    default_rows=domestic_defaults,
+    data_df=st.session_state.domestic_data,
     card_options=DOMESTIC_CARD_OPTIONS,
-    key="domestic_editor"
+    key_prefix="domestic_editor"
 )
 
 edited_eea = build_editor(
     title="EEA Cards Scenario Input",
     description="Select an EEA card type, enter the average transaction amount, number of transactions, and proposed Merchant Fee (%).",
-    default_rows=eea_defaults,
+    data_df=st.session_state.eea_data,
     card_options=EEA_CARD_OPTIONS,
-    key="eea_editor"
+    key_prefix="eea_editor"
+)
+
+edited_international = build_editor(
+    title="International Cards Scenario Input",
+    description="Enter the average transaction amount, number of transactions, and proposed Merchant Fee (%) for International cards.",
+    data_df=st.session_state.international_data,
+    card_options=INTERNATIONAL_CARD_OPTIONS,
+    key_prefix="international_editor"
 )
 
 domestic_results = process_section(edited_domestic, DOMESTIC_CARD_OPTIONS[0])
 eea_results = process_section(edited_eea, EEA_CARD_OPTIONS[0])
+international_results = process_section(edited_international, INTERNATIONAL_CARD_OPTIONS[0])
 
-combined_results = pd.concat([df for df in [domestic_results, eea_results] if not df.empty], ignore_index=True)
+combined_results = pd.concat(
+    [df for df in [domestic_results, eea_results, international_results] if not df.empty],
+    ignore_index=True
+)
 
 if not combined_results.empty:
     st.markdown("---")
